@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bromodoro - Pomodoro Timer with Brown Noise</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.5s ease;
+      }
+
+      body.idle {
+        background-color: #2c3e50;
+      }
+
+      body.pomodoro {
+        background-color: #c0392b;
+      }
+
+      body.short-break {
+        background-color: #27ae60;
+      }
+
+      body.long-break {
+        background-color: #2980b9;
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 40px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 450px;
+        width: 90%;
+      }
+
+      h1 {
+        text-align: center;
+        color: #2c3e50;
+        margin-bottom: 30px;
+        font-size: 1.8rem;
+      }
+
+      .settings-panel {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+      }
+
+      .settings-panel h2 {
+        font-size: 1rem;
+        color: #7f8c8d;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .setting-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .setting-row label {
+        color: #34495e;
+        font-size: 0.95rem;
+      }
+
+      .setting-row input {
+        width: 80px;
+        padding: 8px 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        text-align: center;
+        transition: border-color 0.3s;
+      }
+
+      .setting-row input:focus {
+        outline: none;
+        border-color: #3498db;
+      }
+
+      .setting-row input:disabled {
+        background: #eee;
+        color: #999;
+      }
+
+      .timer-display {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .phase-label {
+        font-size: 1.2rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+        color: #7f8c8d;
+        transition: color 0.3s;
+      }
+
+      .phase-label.pomodoro {
+        color: #c0392b;
+      }
+
+      .phase-label.short-break {
+        color: #27ae60;
+      }
+
+      .phase-label.long-break {
+        color: #2980b9;
+      }
+
+      .time-remaining {
+        font-size: 5rem;
+        font-weight: 700;
+        color: #2c3e50;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        margin-bottom: 15px;
+      }
+
+      .progress-bar {
+        height: 8px;
+        background: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 15px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: #3498db;
+        transition:
+          width 0.3s ease,
+          background-color 0.3s;
+        width: 0%;
+      }
+
+      .progress-fill.pomodoro {
+        background: #c0392b;
+      }
+
+      .progress-fill.short-break {
+        background: #27ae60;
+      }
+
+      .progress-fill.long-break {
+        background: #2980b9;
+      }
+
+      .status {
+        font-size: 0.95rem;
+        color: #7f8c8d;
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 14px 28px;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-start {
+        background: #27ae60;
+        color: white;
+      }
+
+      .btn-start:hover:not(:disabled) {
+        background: #219a52;
+        transform: translateY(-2px);
+      }
+
+      .btn-pause {
+        background: #f39c12;
+        color: white;
+      }
+
+      .btn-pause:hover:not(:disabled) {
+        background: #d68910;
+        transform: translateY(-2px);
+      }
+
+      .btn-reset {
+        background: #e74c3c;
+        color: white;
+      }
+
+      .btn-reset:hover:not(:disabled) {
+        background: #c0392b;
+        transform: translateY(-2px);
+      }
+
+      .completion-message {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        margin-top: 20px;
+      }
+
+      .completion-message.show {
+        display: block;
+        animation: fadeIn 0.5s ease;
+      }
+
+      .completion-message h3 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 25px;
+        }
+
+        .time-remaining {
+          font-size: 3.5rem;
+        }
+
+        .btn {
+          padding: 12px 20px;
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body class="idle">
+    <div class="container">
+      <h1>Bromodoro</h1>
+
+      <div class="settings-panel">
+        <h2>Settings</h2>
+        <div class="setting-row">
+          <label for="pomodoro-duration">Pomodoro (min)</label>
+          <input
+            type="number"
+            id="pomodoro-duration"
+            value="25"
+            min="1"
+            max="60"
+          />
+        </div>
+        <div class="setting-row">
+          <label for="short-break-duration">Short Break (min)</label>
+          <input
+            type="number"
+            id="short-break-duration"
+            value="5"
+            min="1"
+            max="30"
+          />
+        </div>
+        <div class="setting-row">
+          <label for="long-break-duration">Long Break (min)</label>
+          <input
+            type="number"
+            id="long-break-duration"
+            value="15"
+            min="1"
+            max="60"
+          />
+        </div>
+        <div class="setting-row">
+          <label for="total-pomodoros">Total Pomodoros</label>
+          <input
+            type="number"
+            id="total-pomodoros"
+            value="4"
+            min="1"
+            max="20"
+          />
+        </div>
+      </div>
+
+      <div class="timer-display">
+        <div class="phase-label" id="phase-label">Ready</div>
+        <div class="time-remaining" id="time-remaining">25:00</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="status" id="status">Press Start to begin</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-start" id="btn-start">Start</button>
+        <button class="btn btn-pause" id="btn-pause" disabled>Pause</button>
+        <button class="btn btn-reset" id="btn-reset" disabled>Reset</button>
+      </div>
+
+      <div class="completion-message" id="completion-message">
+        <h3>Great Work!</h3>
+        <p>You've completed all your pomodoros!</p>
+      </div>
+    </div>
+
+    <script>
+      // State
+      const state = {
+        settings: {
+          pomodoroDuration: 25,
+          shortBreakDuration: 5,
+          longBreakDuration: 15,
+          totalPomodoros: 4,
+        },
+        timer: {
+          isRunning: false,
+          isPaused: false,
+          currentPhase: "pomodoro", // 'pomodoro', 'short-break', 'long-break'
+          currentPomodoro: 1,
+          timeRemaining: 25 * 60,
+          totalTime: 25 * 60,
+          intervalId: null,
+        },
+      };
+
+      // Audio context
+      let audioContext = null;
+      let brownNoiseNode = null;
+      let brownNoiseGain = null;
+
+      // DOM Elements
+      const elements = {
+        pomodoroDuration: document.getElementById("pomodoro-duration"),
+        shortBreakDuration: document.getElementById("short-break-duration"),
+        longBreakDuration: document.getElementById("long-break-duration"),
+        totalPomodoros: document.getElementById("total-pomodoros"),
+        phaseLabel: document.getElementById("phase-label"),
+        timeRemaining: document.getElementById("time-remaining"),
+        progressFill: document.getElementById("progress-fill"),
+        status: document.getElementById("status"),
+        btnStart: document.getElementById("btn-start"),
+        btnPause: document.getElementById("btn-pause"),
+        btnReset: document.getElementById("btn-reset"),
+        completionMessage: document.getElementById("completion-message"),
+      };
+
+      // Initialize audio context
+      function initAudio() {
+        if (!audioContext) {
+          audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+      }
+
+      // Generate brown noise
+      function createBrownNoise() {
+        const bufferSize = 4096;
+        const brownNoise = audioContext.createScriptProcessor(bufferSize, 1, 1);
+        let lastOut = 0.0;
+
+        brownNoise.onaudioprocess = function (e) {
+          const output = e.outputBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + 0.02 * white) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.5; // Amplify
+          }
+        };
+
+        return brownNoise;
+      }
+
+      // Start brown noise
+      function startBrownNoise() {
+        if (!audioContext) initAudio();
+
+        if (brownNoiseNode) {
+          stopBrownNoise();
+        }
+
+        brownNoiseNode = createBrownNoise();
+        brownNoiseGain = audioContext.createGain();
+        brownNoiseGain.gain.value = 0.3;
+
+        brownNoiseNode.connect(brownNoiseGain);
+        brownNoiseGain.connect(audioContext.destination);
+      }
+
+      // Stop brown noise
+      function stopBrownNoise() {
+        if (brownNoiseNode) {
+          brownNoiseNode.disconnect();
+          brownNoiseNode = null;
+        }
+        if (brownNoiseGain) {
+          brownNoiseGain.disconnect();
+          brownNoiseGain = null;
+        }
+      }
+
+      // Play ring tone
+      function playRingTone(type) {
+        if (!audioContext) initAudio();
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        let frequency, duration, pattern;
+
+        switch (type) {
+          case "pomodoro":
+            // Higher pitch, encouraging tone
+            frequency = 880;
+            duration = 0.15;
+            pattern = [1, 0, 1, 0, 1];
+            break;
+          case "short-break":
+            // Medium pitch, relaxing tone
+            frequency = 523;
+            duration = 0.2;
+            pattern = [1, 0, 1];
+            break;
+          case "long-break":
+            // Lower pitch, celebratory tone
+            frequency = 392;
+            duration = 0.25;
+            pattern = [1, 0, 1, 0, 1, 0, 1];
+            break;
+          default:
+            frequency = 660;
+            duration = 0.2;
+            pattern = [1, 0, 1];
+        }
+
+        let time = audioContext.currentTime;
+        pattern.forEach((on, i) => {
+          if (on) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.type = "sine";
+            osc.frequency.value = frequency;
+
+            gain.gain.setValueAtTime(0.3, time + i * duration);
+            gain.gain.exponentialRampToValueAtTime(
+              0.01,
+              time + i * duration + duration * 0.9,
+            );
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(time + i * duration);
+            osc.stop(time + i * duration + duration);
+          }
+        });
+      }
+
+      // Format time as MM:SS
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      }
+
+      // Update display
+      function updateDisplay() {
+        elements.timeRemaining.textContent = formatTime(
+          state.timer.timeRemaining,
+        );
+
+        const progress =
+          ((state.timer.totalTime - state.timer.timeRemaining) /
+            state.timer.totalTime) *
+          100;
+        elements.progressFill.style.width = `${progress}%`;
+
+        // Update phase label
+        let phaseText = "";
+        switch (state.timer.currentPhase) {
+          case "pomodoro":
+            phaseText = "Pomodoro";
+            break;
+          case "short-break":
+            phaseText = "Short Break";
+            break;
+          case "long-break":
+            phaseText = "Long Break";
+            break;
+        }
+        elements.phaseLabel.textContent = phaseText;
+        elements.phaseLabel.className = `phase-label ${state.timer.currentPhase}`;
+        elements.progressFill.className = `progress-fill ${state.timer.currentPhase}`;
+        document.body.className = state.timer.currentPhase;
+
+        // Update status
+        elements.status.textContent = `Pomodoro ${state.timer.currentPomodoro} of ${state.settings.totalPomodoros}`;
+      }
+
+      // Get duration for current phase
+      function getCurrentPhaseDuration() {
+        switch (state.timer.currentPhase) {
+          case "pomodoro":
+            return state.settings.pomodoroDuration * 60;
+          case "short-break":
+            return state.settings.shortBreakDuration * 60;
+          case "long-break":
+            return state.settings.longBreakDuration * 60;
+          default:
+            return state.settings.pomodoroDuration * 60;
+        }
+      }
+
+      // Get next phase
+      function getNextPhase() {
+        if (state.timer.currentPhase === "pomodoro") {
+          // Check if we've completed all pomodoros
+          if (state.timer.currentPomodoro >= state.settings.totalPomodoros) {
+            return "complete";
+          }
+          // Check if it's time for a long break (every 4th pomodoro)
+          if (state.timer.currentPomodoro % 4 === 0) {
+            return "long-break";
+          }
+          return "short-break";
+        } else {
+          // After any break, go to next pomodoro
+          return "pomodoro";
+        }
+      }
+
+      // Transition to next phase
+      function transitionToNextPhase() {
+        const nextPhase = getNextPhase();
+
+        if (nextPhase === "complete") {
+          completeSession();
+          return;
+        }
+
+        // If transitioning from a break to pomodoro, increment the pomodoro count
+        if (
+          state.timer.currentPhase !== "pomodoro" &&
+          nextPhase === "pomodoro"
+        ) {
+          state.timer.currentPomodoro++;
+        }
+
+        state.timer.currentPhase = nextPhase;
+        state.timer.totalTime = getCurrentPhaseDuration();
+        state.timer.timeRemaining = state.timer.totalTime;
+
+        // Play appropriate ring tone
+        playRingTone(nextPhase);
+
+        // Handle brown noise
+        if (nextPhase === "pomodoro") {
+          startBrownNoise();
+        } else {
+          stopBrownNoise();
+        }
+
+        updateDisplay();
+      }
+
+      // Complete session
+      function completeSession() {
+        stopTimer();
+        stopBrownNoise();
+        playRingTone("long-break");
+        elements.completionMessage.classList.add("show");
+        elements.status.textContent = "Session complete!";
+        document.body.className = "idle";
+      }
+
+      // Timer tick
+      function tick() {
+        if (state.timer.timeRemaining > 0) {
+          state.timer.timeRemaining--;
+          updateDisplay();
+        } else {
+          transitionToNextPhase();
+        }
+      }
+
+      // Start timer
+      function startTimer() {
+        initAudio();
+
+        state.timer.isRunning = true;
+        state.timer.isPaused = false;
+
+        // If starting fresh, set up first phase
+        if (!state.timer.intervalId) {
+          state.timer.currentPhase = "pomodoro";
+          state.timer.currentPomodoro = 1;
+          state.timer.totalTime = getCurrentPhaseDuration();
+          state.timer.timeRemaining = state.timer.totalTime;
+          playRingTone("pomodoro");
+        }
+
+        // Start brown noise for pomodoro phase
+        if (state.timer.currentPhase === "pomodoro") {
+          startBrownNoise();
+        }
+
+        state.timer.intervalId = setInterval(tick, 1000);
+
+        updateDisplay();
+        updateButtons();
+        setSettingsEnabled(false);
+      }
+
+      // Pause timer
+      function pauseTimer() {
+        state.timer.isPaused = true;
+        state.timer.isRunning = false;
+
+        if (state.timer.intervalId) {
+          clearInterval(state.timer.intervalId);
+          state.timer.intervalId = null;
+        }
+
+        stopBrownNoise();
+        updateButtons();
+      }
+
+      // Resume timer
+      function resumeTimer() {
+        state.timer.isPaused = false;
+        state.timer.isRunning = true;
+
+        if (state.timer.currentPhase === "pomodoro") {
+          startBrownNoise();
+        }
+
+        state.timer.intervalId = setInterval(tick, 1000);
+        updateButtons();
+      }
+
+      // Stop timer
+      function stopTimer() {
+        state.timer.isRunning = false;
+        state.timer.isPaused = false;
+
+        if (state.timer.intervalId) {
+          clearInterval(state.timer.intervalId);
+          state.timer.intervalId = null;
+        }
+      }
+
+      // Reset timer
+      function resetTimer() {
+        stopTimer();
+        stopBrownNoise();
+
+        state.timer.currentPhase = "pomodoro";
+        state.timer.currentPomodoro = 1;
+        state.timer.totalTime = state.settings.pomodoroDuration * 60;
+        state.timer.timeRemaining = state.timer.totalTime;
+
+        document.body.className = "idle";
+        elements.phaseLabel.textContent = "Ready";
+        elements.phaseLabel.className = "phase-label";
+        elements.progressFill.className = "progress-fill";
+        elements.progressFill.style.width = "0%";
+        elements.status.textContent = "Press Start to begin";
+        elements.completionMessage.classList.remove("show");
+
+        updateDisplay();
+        updateButtons();
+        setSettingsEnabled(true);
+
+        elements.timeRemaining.textContent = formatTime(
+          state.settings.pomodoroDuration * 60,
+        );
+      }
+
+      // Update button states
+      function updateButtons() {
+        elements.btnStart.disabled = state.timer.isRunning;
+        elements.btnPause.disabled =
+          !state.timer.isRunning && !state.timer.isPaused;
+        elements.btnReset.disabled =
+          !state.timer.isRunning &&
+          !state.timer.isPaused &&
+          state.timer.currentPomodoro === 1 &&
+          state.timer.timeRemaining === state.timer.totalTime;
+
+        elements.btnPause.textContent = state.timer.isPaused
+          ? "Resume"
+          : "Pause";
+
+        if (state.timer.isPaused) {
+          elements.btnPause.disabled = false;
+        }
+      }
+
+      // Enable/disable settings
+      function setSettingsEnabled(enabled) {
+        elements.pomodoroDuration.disabled = !enabled;
+        elements.shortBreakDuration.disabled = !enabled;
+        elements.longBreakDuration.disabled = !enabled;
+        elements.totalPomodoros.disabled = !enabled;
+      }
+
+      // Read settings from inputs
+      function readSettings() {
+        state.settings.pomodoroDuration =
+          parseInt(elements.pomodoroDuration.value) || 25;
+        state.settings.shortBreakDuration =
+          parseInt(elements.shortBreakDuration.value) || 5;
+        state.settings.longBreakDuration =
+          parseInt(elements.longBreakDuration.value) || 15;
+        state.settings.totalPomodoros =
+          parseInt(elements.totalPomodoros.value) || 4;
+
+        // Update initial display
+        state.timer.totalTime = state.settings.pomodoroDuration * 60;
+        state.timer.timeRemaining = state.timer.totalTime;
+        elements.timeRemaining.textContent = formatTime(
+          state.timer.timeRemaining,
+        );
+      }
+
+      // Event listeners
+      elements.btnStart.addEventListener("click", () => {
+        readSettings();
+        startTimer();
+      });
+
+      elements.btnPause.addEventListener("click", () => {
+        if (state.timer.isPaused) {
+          resumeTimer();
+        } else {
+          pauseTimer();
+        }
+      });
+
+      elements.btnReset.addEventListener("click", resetTimer);
+
+      // Update display when settings change
+      [
+        elements.pomodoroDuration,
+        elements.shortBreakDuration,
+        elements.longBreakDuration,
+        elements.totalPomodoros,
+      ].forEach((input) => {
+        input.addEventListener("change", () => {
+          if (!state.timer.isRunning && !state.timer.isPaused) {
+            readSettings();
+          }
+        });
+      });
+
+      // Initialize
+      readSettings();
+    </script>
+  </body>
+</html>
