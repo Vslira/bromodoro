@@ -362,6 +362,7 @@
           timeRemaining: 25 * 60,
           totalTime: 25 * 60,
           intervalId: null,
+          endTime: null, // wall-clock timestamp the current phase ends at
         },
       };
 
@@ -392,6 +393,13 @@
           audioContext = new (
             window.AudioContext || window.webkitAudioContext
           )();
+          // Auto-recover if the browser suspends the context behind our
+          // back (output-device change, long backgrounding, etc.).
+          audioContext.addEventListener("statechange", () => {
+            if (audioContext.state === "suspended" && state.timer.isRunning) {
+              audioContext.resume();
+            }
+          });
         }
         if (audioContext.state === "suspended") {
           audioContext.resume();
@@ -419,7 +427,9 @@
 
       // Start brown noise
       function startBrownNoise() {
-        if (!audioContext) initAudio();
+        // Always run initAudio: it creates the context if missing AND
+        // resumes it if the browser auto-suspended it.
+        initAudio();
 
         if (brownNoiseNode) {
           stopBrownNoise();
@@ -447,7 +457,7 @@
 
       // Play ring tone
       function playRingTone(type) {
-        if (!audioContext) initAudio();
+        initAudio();
 
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
@@ -596,6 +606,7 @@
         state.timer.currentPhase = nextPhase;
         state.timer.totalTime = getCurrentPhaseDuration();
         state.timer.timeRemaining = state.timer.totalTime;
+        state.timer.endTime = Date.now() + state.timer.timeRemaining * 1000;
 
         // Play appropriate ring tone
         playRingTone(nextPhase);
@@ -620,12 +631,18 @@
         document.body.className = "idle";
       }
 
-      // Timer tick
+      // Timer tick. Derives remaining time from a wall-clock end timestamp
+      // rather than counting ticks, so it stays accurate even when a
+      // backgrounded tab throttles setInterval.
       function tick() {
-        if (state.timer.timeRemaining > 0) {
-          state.timer.timeRemaining--;
+        const remaining = Math.round((state.timer.endTime - Date.now()) / 1000);
+
+        if (remaining > 0) {
+          state.timer.timeRemaining = remaining;
           updateDisplay();
         } else {
+          state.timer.timeRemaining = 0;
+          updateDisplay();
           transitionToNextPhase();
         }
       }
@@ -651,6 +668,7 @@
           startBrownNoise();
         }
 
+        state.timer.endTime = Date.now() + state.timer.timeRemaining * 1000;
         state.timer.intervalId = setInterval(tick, 1000);
 
         updateDisplay();
@@ -681,6 +699,7 @@
           startBrownNoise();
         }
 
+        state.timer.endTime = Date.now() + state.timer.timeRemaining * 1000;
         state.timer.intervalId = setInterval(tick, 1000);
         updateButtons();
       }
@@ -798,6 +817,19 @@
             readSettings();
           }
         });
+      });
+
+      // Recover audio when returning to the tab after it was backgrounded
+      // (the browser may have suspended the context while we were away).
+      document.addEventListener("visibilitychange", () => {
+        if (
+          !document.hidden &&
+          audioContext &&
+          audioContext.state === "suspended" &&
+          state.timer.isRunning
+        ) {
+          audioContext.resume();
+        }
       });
 
       // Initialize
